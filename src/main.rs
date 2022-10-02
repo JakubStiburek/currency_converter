@@ -1,25 +1,35 @@
 use hyper::Client;
 use hyper::body::HttpBody as _;
 use tokio::io::{stdout, AsyncWriteExt as _};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use hyper_tls::HttpsConnector;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
+use std::fmt;
 
 #[derive(Parser, Debug)]
 #[command(author = "Jakub Stiburek", version = "0.0.0", about = "Simple currency converter.")]
 struct Args {
-    #[arg(short, long, help = "The amount to be converted", default_value_t = 1.0)]
-    amount: f32,
+    amount: Option<f32>,
     
-    #[arg(short, long, help = "First currency code", default_value_t = String::from("eur"))]
-    first: String,
+    first: Option<Code>,
     
-    #[arg(short, long, help = "Second currency code", default_value_t = String::from("usd"))]
-    second: String,
-    
-    #[arg(short, long, help = "List available currency codes", default_value_t = false)]
-    codes: bool,
+    second: Option<Code>,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+enum Code {
+    Czk,
+    Eur,
+    Usd,
+    Gbp,
+    Pln
+}
+
+impl fmt::Display for Code {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[tokio::main]
@@ -28,17 +38,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let client = Client::builder().build::<_, hyper::Body>(https);
     let args = Args::parse();
     
-    println!("{}", args.first);
-    println!("{}", args.second);
-    if args.codes {
-        println!("codes")
-    }
+    let first = match args.first {
+        Some(c) => c.to_string().to_lowercase(),
+        None => Code::Eur.to_string().to_lowercase()
+    };
+    let second = match args.second {
+        Some(c) => c.to_string().to_lowercase(),
+        None => Code::Czk.to_string().to_lowercase()
+    };
+    let amount = match args.amount {
+        Some(a) => a,
+        None => 1.0
+    };
     
-    let uri = format!("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/{first}/{second}.json", first = args.first, second = args.second).parse()?;
+    let uri = format!("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/{first}/{second}.json", first = &first, second = &second).parse()?;
 
     let mut resp = client.get(uri).await?;
-    
-    println!("Response: {}", resp.status());
     
     let mut data = Vec::new();
     while let Some(chunk) = resp.body_mut().data().await {
@@ -46,9 +61,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
     
     let parsed: Value = serde_json::from_slice(&data)?;
-    let rate = parsed[&args.second].to_string();
+    let rate = parsed[&second].to_string();
     
-    println!("{} {} is {} {}", args.amount, args.first, rate.parse::<f32>()? * args.amount, &args.second);
+    println!("{} {} is {} {}", &amount, &first, rate.parse::<f32>()? * &amount, &second);
     
     Ok(())
 }
