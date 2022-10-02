@@ -1,9 +1,7 @@
 use hyper::Client;
 use hyper::body::HttpBody as _;
-use tokio::io::{stdout, AsyncWriteExt as _};
 use clap::{Parser, ValueEnum};
 use hyper_tls::HttpsConnector;
-use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use std::fmt;
 
