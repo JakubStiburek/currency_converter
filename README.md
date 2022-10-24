@@ -14,4 +14,5 @@ A simple currency convertor CLI written as an exercise as I'm learning Rust.
 
 - [ ] Switch the source of currency rates (possibly EU bank)
 - [ ] Cache currency rates for one day
+  - [ ] Add delay or switch currency rates origin
 - [ ] Add table of currency rates (using [cli-table](https://crates.io/crates/cli-table))

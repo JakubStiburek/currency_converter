@@ -1,9 +1,10 @@
-use hyper::Client;
+use hyper::{Client};
 use hyper::body::HttpBody as _;
 use clap::{Parser, ValueEnum};
 use hyper_tls::HttpsConnector;
 use serde_json::{Value};
 use std::fmt;
+use tokio::time::{timeout, Duration};
 
 #[derive(Parser, Debug)]
 #[command(author = "Jakub Stiburek", version = "0.0.0", about = "Simple currency converter.")]
@@ -30,6 +31,22 @@ impl fmt::Display for Code {
     }
 }
 
+static CODES: [&str; 5] = ["czk", "eur", "usd", "gbp", "pln"];
+
+struct Pair {
+    first: String,
+    second: String
+}
+
+impl Pair {
+    fn new(first: String, second: String) -> Self {
+        Self {
+            first,
+            second
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let https = HttpsConnector::new();
@@ -49,19 +66,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         None => 1.0
     };
     
-    let uri = format!("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/{first}/{second}.json", first = &first, second = &second).parse()?;
-
-    let mut resp = client.get(uri).await?;
+    let mut pairs: Vec<Pair> = vec![];
     
-    let mut data = Vec::new();
-    while let Some(chunk) = resp.body_mut().data().await {
-        data.extend(&chunk?)
+    for i in CODES.iter() {
+        for j in  CODES.iter(){
+            pairs.push(Pair::new(i.to_string(), j.to_string()))
+        }
     }
     
-    let parsed: Value = serde_json::from_slice(&data)?;
-    let rate = parsed[&second].to_string();
+    let mut uris: Vec<String> = vec![];
     
-    println!("{} {} is {} {}", &amount, &first, rate.parse::<f32>()? * &amount, &second);
+    for i in pairs.iter() {
+        uris.push(format!("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/{}/{}.json", &i.first, &i.second));
+    }
+    
+    let mut rates: Vec<f32> = vec![];
+    
+    for uri in uris.iter() {
+        let mut resp = client.get(uri.parse()?).await?;
+        
+        println!("{}", &uri);
+    
+        let mut data = Vec::new();
+        while let Some(chunk) = resp.body_mut().data().await {
+            data.extend(&chunk?)
+        }
+    
+        let parsed: Value = serde_json::from_slice(&data)?;
+        let rate = parsed[&second].to_string();
+        
+        println!("{}", &rate);
+        
+        rates.push(rate.parse::<f32>()? * &amount);
+    }
+    
+    for r in rates {
+        println!("{}", r);
+    }
     
     Ok(())
 }
